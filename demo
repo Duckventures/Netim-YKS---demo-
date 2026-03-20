@@ -1,0 +1,2801 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Netim YKS — Sınav Puanı Takipçisi</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* Liquid Glass Palette */
+    --bg-from: #0d0a1a;
+    --bg-mid:  #0a0f2e;
+    --bg-to:   #1a0a2e;
+
+    /* Glass surfaces */
+    --glass:        rgba(255,255,255,0.06);
+    --glass-hover:  rgba(255,255,255,0.10);
+    --glass-active: rgba(255,255,255,0.14);
+    --glass-border: rgba(255,255,255,0.14);
+    --glass-shine:  rgba(255,255,255,0.22);
+
+    /* Keep legacy vars mapped so existing code still works */
+    --bg: #0d0a1a;
+    --surface: rgba(255,255,255,0.06);
+    --surface2: rgba(255,255,255,0.04);
+    --border: rgba(255,255,255,0.12);
+    --border-glow: rgba(168,85,247,0.5);
+    --text: #f0eeff;
+    --muted: rgba(200,190,255,0.5);
+    --purple: #b47dff;
+    --purple-bright: #d4a8ff;
+    --purple-dim: #8b5cf6;
+    --purple-glow: rgba(168,85,247,0.4);
+    --purple-glow-soft: rgba(168,85,247,0.15);
+    --accent-tyt: #c084fc;
+    --accent-ayt: #93c5fd;
+    --accent-tyt-light: rgba(192,132,252,0.15);
+    --accent-ayt-light: rgba(147,197,253,0.12);
+    --success: #6ee7b7;
+    --danger:  #fca5a5;
+    --radius: 20px;
+    --radius-sm: 14px;
+
+    /* Liquid glass shadows */
+    --shadow:      0 4px 24px rgba(0,0,0,0.35), 0 1px 0 var(--glass-shine) inset, 0 0 0 1px var(--glass-border);
+    --shadow-lg:   0 8px 40px rgba(0,0,0,0.45), 0 1px 0 var(--glass-shine) inset, 0 0 0 1px var(--glass-border);
+    --glow-shadow: 0 0 20px var(--purple-glow), 0 8px 32px rgba(0,0,0,0.4), 0 1px 0 var(--glass-shine) inset, 0 0 0 1px rgba(168,85,247,0.3);
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 16px var(--purple-glow), 0 8px 32px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.2) inset, 0 0 0 1px rgba(168,85,247,0.25); }
+    50%       { box-shadow: 0 0 28px var(--purple-glow), 0 8px 40px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.25) inset, 0 0 0 1px rgba(168,85,247,0.4); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes shimmer {
+    0%   { background-position: -200% center; }
+    100% { background-position:  200% center; }
+  }
+
+  /* ── ANIMATED LIQUID BACKGROUND ── */
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg-from);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+    position: relative;
+    overflow-x: hidden;
+    background:
+      radial-gradient(ellipse 120% 60% at 20% 10%,  rgba(139,92,246,0.28) 0%, transparent 55%),
+      radial-gradient(ellipse 80%  50% at 85% 15%,  rgba(59,130,246,0.18)  0%, transparent 50%),
+      radial-gradient(ellipse 60%  70% at 10% 80%,  rgba(236,72,153,0.12)  0%, transparent 55%),
+      radial-gradient(ellipse 100% 60% at 75% 90%,  rgba(139,92,246,0.20)  0%, transparent 55%),
+      linear-gradient(160deg, #0d0a1a 0%, #0a0f2e 50%, #1a0a2e 100%);
+  }
+
+  /* HEADER */
+  header {
+    background: rgba(13,10,26,0.55);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    border-bottom: 1px solid rgba(255,255,255,0.10);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 4px 24px rgba(0,0,0,0.3);
+    padding: 16px 20px 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .logo-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    color: var(--purple-bright);
+    letter-spacing: -0.3px;
+    text-shadow: 0 0 20px var(--purple-glow);
+  }
+
+  .logo-sub {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .session-date {
+    font-size: 12px;
+    color: rgba(210,200,255,0.7);
+    background: rgba(255,255,255,0.07);
+    backdrop-filter: blur(12px);
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.13);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset;
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 0;
+    flex-wrap: wrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .tab.active-tyt {
+    color: #e4c6ff;
+    border-bottom-color: #c084fc;
+    text-shadow: 0 0 14px rgba(192,132,252,0.7);
+  }
+
+  .tab.active-ayt {
+    color: #bdd7ff;
+    border-bottom-color: #93c5fd;
+    text-shadow: 0 0 14px rgba(147,197,253,0.6);
+  }
+
+  .tab:hover:not(.active-tyt):not(.active-ayt) { color: var(--text); }
+
+  /* MAIN LAYOUT */
+  main {
+    padding: 16px 12px;
+    max-width: 860px;
+    margin: 0 auto;
+    overflow-x: hidden;
+  }
+
+  /* SECTION HEADER */
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--purple-dim);
+    margin-bottom: 12px;
+  }
+
+  /* SCORE ENTRY GRID */
+  .score-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .score-card {
+    background: var(--glass);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 14px;
+    box-shadow: var(--shadow);
+    transition: all 0.3s ease;
+    animation: fadeIn 0.3s ease both;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .score-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  }
+
+  .score-card:focus-within {
+    background: var(--glass-hover);
+    border-color: rgba(192,132,252,0.5);
+    box-shadow: var(--glow-shadow);
+    transform: translateY(-1px);
+  }
+
+  .score-card label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .score-input-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .score-input-row input {
+    width: 100%;
+    border: none;
+    outline: none;
+    font-family: 'DM Serif Display', serif;
+    font-size: 26px;
+    color: var(--purple-bright);
+    background: none;
+    -moz-appearance: textfield;
+  }
+
+  .score-input-row input::-webkit-outer-spin-button,
+  .score-input-row input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+  .score-max {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    padding-top: 6px;
+  }
+
+  /* SAVE BUTTON */
+  .save-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .date-input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(12px);
+    color: var(--text);
+    outline: none;
+    transition: all 0.25s;
+    color-scheme: dark;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.1) inset;
+  }
+
+  .date-input:focus {
+    border-color: rgba(192,132,252,0.5);
+    box-shadow: 0 0 14px rgba(168,85,247,0.2), 0 1px 0 rgba(255,255,255,0.15) inset;
+    background: rgba(255,255,255,0.09);
+  }
+
+  .save-btn {
+    padding: 12px 24px;
+    border-radius: 12px;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    position: relative;
+  }
+
+  .save-btn-tyt {
+    background: linear-gradient(135deg, rgba(124,58,237,0.7), rgba(192,132,252,0.8));
+    backdrop-filter: blur(12px);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.2);
+    box-shadow: 0 0 20px rgba(168,85,247,0.45), 0 1px 0 rgba(255,255,255,0.25) inset;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+
+  .save-btn-ayt {
+    background: linear-gradient(135deg, rgba(67,56,202,0.7), rgba(147,197,253,0.75));
+    backdrop-filter: blur(12px);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.2);
+    box-shadow: 0 0 20px rgba(129,140,248,0.4), 0 1px 0 rgba(255,255,255,0.25) inset;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+
+  .save-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .save-btn:active { transform: scale(0.97); }
+
+  .save-confirm {
+    font-size: 13px;
+    color: var(--success);
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.3s;
+    text-shadow: 0 0 10px rgba(52,211,153,0.5);
+  }
+  .save-confirm.visible { opacity: 1; }
+
+  /* DIVIDER */
+  .divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.12), transparent);
+    margin: 4px 0 28px;
+  }
+
+  /* CHARTS */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+
+  @media (min-width: 600px) {
+    .charts-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  .chart-card {
+    background: var(--glass);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .chart-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
+    pointer-events: none;
+  }
+
+  .chart-card:hover {
+    background: var(--glass-hover);
+    box-shadow: var(--glow-shadow);
+    border-color: rgba(168,85,247,0.3);
+    transform: translateY(-1px);
+  }
+
+  .chart-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .chart-subtitle {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .chart-wrap {
+    position: relative;
+    height: 200px;
+  }
+
+  /* Bar chart gets a minimum width so bars don't squish on mobile */
+  .chart-wrap-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .chart-wrap-bar-inner {
+    position: relative;
+    height: 200px;
+    min-width: 320px;
+  }
+
+  /* HISTORY TABLE */
+  .history-card {
+    background: var(--glass);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-bottom: 28px;
+    position: relative;
+  }
+
+  .history-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .history-body-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .history-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .history-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .clear-btn {
+    font-size: 12px;
+    color: var(--danger);
+    background: rgba(252,165,165,0.06);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(252,165,165,0.2);
+    padding: 4px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s;
+  }
+
+  .clear-btn:hover { background: rgba(252,165,165,0.12); border-color: rgba(252,165,165,0.35); }
+
+  .history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .history-table th {
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: rgba(210,200,255,0.5);
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .history-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    vertical-align: middle;
+    color: var(--text);
+  }
+
+  .history-table tr:last-child td { border-bottom: none; }
+
+  .history-table tr:hover td { background: rgba(168,85,247,0.07); }
+
+  .history-table .score-pill {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  .pill-tyt {
+    background: rgba(168,85,247,0.2);
+    color: var(--purple-bright);
+    border: 1px solid rgba(168,85,247,0.3);
+  }
+
+  .pill-ayt {
+    background: rgba(129,140,248,0.2);
+    color: #a5b4fc;
+    border: 1px solid rgba(129,140,248,0.3);
+  }
+
+  .empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .empty-icon { font-size: 32px; margin-bottom: 8px; }
+
+  /* STATS ROW */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--glass);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    text-align: center;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
+  }
+
+  .stat-card:hover {
+    background: var(--glass-hover);
+    border-color: rgba(168,85,247,0.35);
+    box-shadow: 0 0 18px rgba(168,85,247,0.22), 0 8px 24px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.2) inset;
+    transform: translateY(-2px);
+  }
+
+  .stat-value {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .stat-trend {
+    font-size: 11px;
+    margin-top: 4px;
+    font-weight: 600;
+  }
+
+  .trend-up   { color: var(--success); text-shadow: 0 0 8px rgba(52,211,153,0.4); }
+  .trend-down { color: var(--danger);  text-shadow: 0 0 8px rgba(248,113,113,0.4); }
+  .trend-flat { color: var(--muted); }
+
+  /* COUNTDOWN BANNER */
+  .countdown-banner {
+    background: rgba(139,92,246,0.10);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(192,132,252,0.28);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--glow-shadow);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    animation: pulse-glow 4s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .countdown-banner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 60% 80% at 0% 50%, rgba(124,58,237,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .countdown-left { display: flex; flex-direction: column; gap: 4px; position: relative; }
+
+  .countdown-exam-name {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .countdown-headline {
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px;
+    color: var(--purple-bright);
+    text-shadow: 0 0 16px var(--purple-glow);
+  }
+
+  .countdown-edit {
+    font-size: 11px;
+    color: var(--muted);
+    text-decoration: underline;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    padding: 0;
+    margin-top: 2px;
+    transition: color 0.2s;
+  }
+
+  .countdown-edit:hover { color: var(--purple-bright); }
+
+  .countdown-blocks { display: flex; gap: 6px; position: relative; }
+
+  .cd-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(255,255,255,0.07);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+    padding: 8px 10px;
+    min-width: 46px;
+    transition: all 0.3s;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.18) inset;
+  }
+
+  .cd-block:hover { box-shadow: 0 0 12px var(--purple-glow); }
+
+  .cd-num {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--purple-bright);
+    text-shadow: 0 0 12px var(--purple-glow);
+  }
+
+  .cd-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .cd-block.urgent .cd-num { color: var(--danger); text-shadow: 0 0 10px rgba(248,113,113,0.5); }
+  .cd-block.soon   .cd-num { color: #fbbf24;       text-shadow: 0 0 10px rgba(251,191,36,0.5); }
+  .cd-block.safe   .cd-num { color: var(--success); text-shadow: 0 0 10px rgba(52,211,153,0.5); }
+
+  .date-edit-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .date-edit-row input[type="date"] {
+    padding: 6px 10px;
+    border: 1px solid var(--border-glow);
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    background: var(--surface2);
+    color: var(--text);
+    outline: none;
+    color-scheme: dark;
+  }
+
+  .date-edit-row button {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: white;
+    transition: filter 0.2s;
+  }
+
+  .date-edit-row button:hover { filter: brightness(1.15); }
+
+  .exam-tabs-cd { display: flex; gap: 6px; }
+
+  .exam-tab-cd {
+    padding: 5px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s;
+  }
+
+  .exam-tab-cd.active-tyt {
+    background: rgba(168,85,247,0.2);
+    color: var(--purple-bright);
+    border-color: var(--purple);
+    box-shadow: 0 0 8px rgba(168,85,247,0.3);
+  }
+
+  .exam-tab-cd.active-ayt {
+    background: rgba(129,140,248,0.2);
+    color: #a5b4fc;
+    border-color: #818cf8;
+    box-shadow: 0 0 8px rgba(129,140,248,0.3);
+  }
+
+
+  /* ═══════════════════════════════════════════════
+     POMODORO TIMER
+  ═══════════════════════════════════════════════ */
+
+  .pomo-wrap {
+    margin-bottom: 28px;
+    animation: fadeIn 0.4s ease both;
+  }
+
+  .pomo-card {
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    border: 1px solid rgba(255,255,255,0.13);
+    border-radius: 28px;
+    padding: 28px 24px 24px;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .pomo-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+    pointer-events: none;
+  }
+
+  .pomo-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 60% at 50% 0%, rgba(124,58,237,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* MODE BADGE */
+  .pomo-mode-badge {
+    display: flex;
+    gap: 8px;
+    position: relative;
+  }
+
+  .pomo-mode-btn {
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    color: var(--muted);
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+
+  .pomo-mode-btn.mode-study.active {
+    background: rgba(168,85,247,0.2);
+    color: var(--purple-bright);
+    border-color: var(--purple);
+    box-shadow: 0 0 10px rgba(168,85,247,0.3);
+  }
+
+  .pomo-mode-btn.mode-short.active {
+    background: rgba(52,211,153,0.15);
+    color: #34d399;
+    border-color: #34d399;
+    box-shadow: 0 0 10px rgba(52,211,153,0.3);
+  }
+
+  .pomo-mode-btn.mode-long.active {
+    background: rgba(251,191,36,0.15);
+    color: #fbbf24;
+    border-color: #fbbf24;
+    box-shadow: 0 0 10px rgba(251,191,36,0.3);
+  }
+
+  /* RING */
+  .pomo-ring-wrap {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pomo-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 200px; height: 200px;
+    transform: rotate(-90deg);
+  }
+
+  .pomo-ring-bg {
+    fill: none;
+    stroke: rgba(124,58,237,0.15);
+    stroke-width: 6;
+  }
+
+  .pomo-ring-progress {
+    fill: none;
+    stroke: var(--purple);
+    stroke-width: 6;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear, stroke 0.4s;
+    filter: drop-shadow(0 0 6px rgba(168,85,247,0.8));
+  }
+
+  .pomo-ring-progress.mode-short-ring {
+    stroke: #34d399;
+    filter: drop-shadow(0 0 6px rgba(52,211,153,0.8));
+  }
+
+  .pomo-ring-progress.mode-long-ring {
+    stroke: #fbbf24;
+    filter: drop-shadow(0 0 6px rgba(251,191,36,0.8));
+  }
+
+  .pomo-time-display {
+    position: relative;
+    text-align: center;
+    z-index: 1;
+  }
+
+  .pomo-time {
+    font-family: 'DM Serif Display', serif;
+    font-size: 52px;
+    line-height: 1;
+    color: var(--text);
+    letter-spacing: -2px;
+  }
+
+  .pomo-time.study-color  { color: var(--purple-bright); text-shadow: 0 0 20px var(--purple-glow); }
+  .pomo-time.short-color  { color: #34d399; text-shadow: 0 0 20px rgba(52,211,153,0.5); }
+  .pomo-time.long-color   { color: #fbbf24; text-shadow: 0 0 20px rgba(251,191,36,0.5); }
+
+  .pomo-session-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  /* CONTROLS */
+  .pomo-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .pomo-btn {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    border: 1px solid var(--border-glow);
+    background: rgba(124,58,237,0.15);
+    color: var(--purple-bright);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .pomo-btn:hover {
+    background: rgba(168,85,247,0.25);
+    box-shadow: 0 0 14px rgba(168,85,247,0.4);
+    transform: scale(1.05);
+  }
+
+  .pomo-btn:active { transform: scale(0.95); }
+
+  .pomo-btn-main {
+    width: 64px; height: 64px;
+    font-size: 24px;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    border: none;
+    box-shadow: 0 0 20px rgba(168,85,247,0.45);
+    color: white;
+  }
+
+  .pomo-btn-main:hover {
+    box-shadow: 0 0 30px rgba(168,85,247,0.65);
+    background: linear-gradient(135deg, #6d28d9, #9333ea);
+    color: white;
+  }
+
+  /* ADJUSTERS */
+  .pomo-adjusters {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .pomo-adj-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pomo-adj-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .pomo-adj-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pomo-adj-btn {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--border-glow);
+    background: rgba(124,58,237,0.15);
+    color: var(--purple-bright);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+    transition: all 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .pomo-adj-btn:hover {
+    background: rgba(168,85,247,0.3);
+    box-shadow: 0 0 8px rgba(168,85,247,0.3);
+  }
+
+  .pomo-adj-val {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    color: var(--text);
+    min-width: 28px;
+    text-align: center;
+  }
+
+  /* LOOP COUNTER */
+  .pomo-loops-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .pomo-loop-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--border);
+    border: 1px solid var(--border-glow);
+    transition: all 0.3s;
+  }
+
+  .pomo-loop-dot.done {
+    background: var(--purple);
+    box-shadow: 0 0 8px var(--purple-glow);
+  }
+
+  .pomo-loop-dot.active {
+    background: var(--purple-bright);
+    box-shadow: 0 0 12px rgba(168,85,247,0.8);
+    transform: scale(1.3);
+  }
+
+  .pomo-loop-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: 4px;
+  }
+
+  /* STREAK */
+  .pomo-streak {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .pomo-streak span {
+    color: var(--purple-bright);
+    font-weight: 600;
+  }
+
+
+  /* ═══════════════════════════════════════════════
+     UNIVERSITY TARGET FEATURE
+  ═══════════════════════════════════════════════ */
+
+  .target-uni-select {
+    width: 100%;
+    padding: 13px 16px;
+    border: 1px solid rgba(255,255,255,0.13);
+    border-radius: 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    background: rgba(255,255,255,0.07);
+    backdrop-filter: blur(16px);
+    color: var(--text);
+    outline: none;
+    margin-bottom: 10px;
+    transition: all 0.2s;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23c4b5fd' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    cursor: pointer;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.12) inset;
+  }
+  .target-uni-select:focus { box-shadow: 0 0 14px rgba(168,85,247,0.2), 0 1px 0 rgba(255,255,255,0.12) inset; border-color: rgba(192,132,252,0.45); background: rgba(255,255,255,0.10); }
+  .target-uni-select option { background: #100d20; color: var(--text); }
+
+  .target-selects-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 520px) { .target-selects-row { grid-template-columns: 1fr; } }
+
+  .target-info-card {
+    background: rgba(139,92,246,0.10);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid rgba(192,132,252,0.25);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 20px rgba(0,0,0,0.3);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .target-info-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    pointer-events: none;
+  }
+
+  .target-uni-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    color: var(--purple-bright);
+    text-shadow: 0 0 14px var(--purple-glow);
+  }
+
+  .target-dept-name {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .target-score-badge {
+    text-align: center;
+  }
+
+  .target-score-num {
+    font-family: 'DM Serif Display', serif;
+    font-size: 32px;
+    color: var(--purple-bright);
+    text-shadow: 0 0 16px var(--purple-glow);
+    line-height: 1;
+  }
+
+  .target-score-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-top: 2px;
+  }
+
+  /* SUBJECT LOCK GRID */
+  .target-subject-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .target-subject-card {
+    background: var(--glass);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 14px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+
+  .target-subject-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+    pointer-events: none;
+  }
+
+  .target-subject-card.locked {
+    border-color: var(--purple);
+    box-shadow: 0 0 12px rgba(168,85,247,0.25);
+    background: rgba(168,85,247,0.06);
+  }
+
+  .target-subject-card.exceeds {
+    border-color: var(--success);
+    box-shadow: 0 0 10px rgba(52,211,153,0.2);
+  }
+
+  .target-subject-card.needs-work {
+    border-color: rgba(248,113,113,0.4);
+  }
+
+  .target-subj-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .target-subj-name {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .lock-toggle {
+    width: 28px; height: 16px;
+    background: var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    border: none;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+
+  .lock-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: white;
+    transition: transform 0.2s;
+  }
+
+  .lock-toggle.on {
+    background: var(--purple);
+    box-shadow: 0 0 8px rgba(168,85,247,0.5);
+  }
+
+  .lock-toggle.on::after { transform: translateX(12px); }
+
+  .target-subj-input {
+    width: 100%;
+    border: none;
+    outline: none;
+    background: none;
+    font-family: 'DM Serif Display', serif;
+    font-size: 24px;
+    color: var(--purple-bright);
+    -moz-appearance: textfield;
+    margin-bottom: 4px;
+  }
+
+  .target-subj-input::-webkit-outer-spin-button,
+  .target-subj-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+  .target-subj-input:disabled { color: var(--muted); opacity: 0.7; }
+
+  .target-subj-required {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .target-subj-required .req-num {
+    font-weight: 700;
+  }
+
+  .req-ok   { color: var(--success); }
+  .req-warn { color: var(--danger); }
+  .req-lock { color: var(--purple-bright); }
+
+  /* GAP SUMMARY */
+  .target-gap-card {
+    background: rgba(139,92,246,0.08);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(192,132,252,0.22);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--glow-shadow);
+    animation: pulse-glow 4s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .target-gap-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
+    pointer-events: none;
+  }
+
+  .target-gap-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .target-gap-label {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .target-gap-value {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+  }
+
+  .gap-positive { color: var(--success); text-shadow: 0 0 10px rgba(52,211,153,0.5); }
+  .gap-negative { color: var(--danger);  text-shadow: 0 0 10px rgba(248,113,113,0.4); }
+  .gap-zero     { color: var(--purple-bright); text-shadow: 0 0 10px var(--purple-glow); }
+
+  .target-progress-bar-wrap {
+    height: 8px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+
+  .target-progress-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+  }
+
+  /* IMPROVEMENT LIST */
+  .improvement-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .improvement-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(12px);
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.09);
+    transition: all 0.2s;
+  }
+
+  .improvement-row:hover {
+    background: rgba(255,255,255,0.07);
+  }
+
+  .improvement-row.done {
+    border-color: rgba(110,231,183,0.25);
+    background: rgba(110,231,183,0.05);
+  }
+
+  .improvement-subj {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    min-width: 80px;
+  }
+
+  .improvement-bar-wrap {
+    flex: 1;
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .improvement-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+
+  .improvement-delta {
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 52px;
+    text-align: right;
+  }
+
+  .delta-ok   { color: var(--success); }
+  .delta-warn { color: var(--danger); }
+  .delta-lock { color: var(--purple-bright); }
+
+  .target-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  /* HIDDEN */
+  .hidden { display: none !important; }
+
+  /* ═══════════════════════════════════════════════
+     MOBILE RESPONSIVE
+  ═══════════════════════════════════════════════ */
+
+  /* History table horizontal scroll wrapper */
+  .history-body-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  @media (max-width: 480px) {
+    header { padding: 12px 12px 0; }
+
+    .header-top { margin-bottom: 10px; }
+
+    .logo-title { font-size: 18px; }
+    .logo-sub   { font-size: 10px; }
+    .session-date { font-size: 11px; padding: 4px 8px; }
+
+    .tab { padding: 8px 10px; font-size: 11px; }
+
+    main { padding: 12px 10px; }
+
+    .score-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .score-card { padding: 10px; }
+
+    .save-row {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .date-input { min-width: 0; flex: 1 1 100%; }
+    .save-btn   { flex: 1; }
+
+    .stats-row {
+      grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+      gap: 6px;
+    }
+
+    .stat-card { padding: 10px 8px; }
+    .stat-value { font-size: 20px; }
+
+    .charts-grid { gap: 12px; }
+    .chart-card { padding: 14px; }
+    .chart-wrap { height: 160px; }
+
+    .history-table th,
+    .history-table td { padding: 8px 10px; font-size: 11px; }
+
+    .countdown-headline { font-size: 15px; }
+
+    .target-subject-grid {
+      grid-template-columns: 1fr 1fr !important;
+    }
+
+    .pomo-time { font-size: 42px; }
+    .pomo-ring-wrap { width: 170px; height: 170px; }
+    .pomo-svg { width: 170px; height: 170px; }
+
+    .improvement-subj { min-width: 60px; font-size: 11px; }
+    .improvement-delta { min-width: 40px; font-size: 11px; }
+  }
+
+  @media (max-width: 360px) {
+    .score-grid { grid-template-columns: 1fr 1fr; }
+    .tab { padding: 7px 8px; font-size: 10px; }
+    .cd-num { font-size: 18px; }
+    .cd-block { min-width: 38px; padding: 6px 6px; }
+  }
+
+  /* ═══════════════════════════════════════════════
+     SPLASH SCREEN
+  ═══════════════════════════════════════════════ */
+  #splashScreen {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.8s ease;
+    cursor: pointer;
+  }
+  #splashScreen.fade-out {
+    opacity: 0;
+    pointer-events: none;
+  }
+  #splashScreen img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+  }
+
+</style>
+</head>
+<body>
+<div id="splashScreen"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAcAAzwDASIAAhEBAxEB/8QAHAABAQACAwEBAAAAAAAAAAAAAAECBwQFBgMI/8QASBABAAEDAgIGBgYGCAUFAQEAAAECAwQFEQYxEiEyQVFzBxMiNWFxFDZCgZGxFSMzUqGyF0NUYnKSwdEWJHSDwjRTVWPhJUX/xAAaAQEAAwEBAQAAAAAAAAAAAAAAAQIDBQQG/8QAJhEBAAICAwACAgICAwAAAAAAAAECAxEEEjEhQRMiFGFCUQUycf/aAAwDAQACEQMRAD8A2cAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD//2Q==" alt="Netim YKS"></div>
+
+<header>
+  <div class="header-top">
+    <div class="logo">
+      <span class="logo-title">Netim YKS</span>
+      <span class="logo-sub">Sınav İzleyici</span>
+    </div>
+    <span class="session-date" id="todayDate"></span>
+  </div>
+  <div class="tabs">
+    <button class="tab active-tyt" id="tabTYT" onclick="switchPage('scores'); switchExam('TYT')">TYT — Temel Yeterlilik</button>
+    <button class="tab" id="tabAYT" onclick="switchPage('scores'); switchExam('AYT')">AYT — Alan Yeterlilik</button>
+    <button class="tab" id="tabPomo" onclick="switchPage('pomodoro')">⏱ Pomodoro</button>
+    <button class="tab" id="tabTarget" onclick="switchPage('target')">🎯 Hedef Üniversite</button>
+  </div>
+</header>
+
+<main>
+
+  <div id="scoresPage">
+  <!-- COUNTDOWN BANNER -->
+  <div class="countdown-banner" id="countdownBanner">
+    <div class="countdown-left">
+      <div class="exam-tabs-cd">
+        <button class="exam-tab-cd active-tyt" id="cdTabTYT" onclick="switchCdExam('TYT')">TYT</button>
+        <button class="exam-tab-cd" id="cdTabAYT" onclick="switchCdExam('AYT')">AYT</button>
+      </div>
+      <div class="countdown-headline" id="cdHeadline">YKS'ye ne kadar kaldı?</div>
+      <div id="cdEditArea">
+        <button class="countdown-edit" onclick="showDateEdit()">📅 Sınav tarihini ayarla</button>
+      </div>
+    </div>
+    <div class="countdown-blocks" id="cdBlocks">
+      <div class="cd-block" id="cdDayBlock"><div class="cd-num" id="cdDays">—</div><div class="cd-label">Gün</div></div>
+      <div class="cd-block"><div class="cd-num" id="cdHours">—</div><div class="cd-label">Saat</div></div>
+      <div class="cd-block"><div class="cd-num" id="cdMins">—</div><div class="cd-label">Dakika</div></div>
+    </div>
+  </div>
+
+  <!-- SCORE ENTRY -->
+  <div class="section-label" id="entryLabel">TYT — Doğru / Yanlış Gir</div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:12px;margin-top:-6px">Net = Doğru − (Yanlış ÷ 4) · Uygulama YKS puanına otomatik çevirir.</div>
+
+  <div class="score-grid" id="scoreGrid"></div>
+
+  <div class="save-row">
+    <input type="date" class="date-input" id="sessionDate">
+    <button class="save-btn save-btn-tyt" id="saveBtn" onclick="saveSession()">Kaydet</button>
+    <span class="save-confirm" id="saveConfirm">✓ Kaydedildi</span>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- STATS -->
+  <div class="section-label" id="statsLabel">Genel Bakış</div>
+  <div class="stats-row" id="statsRow">
+    <div class="empty-state" style="grid-column:1/-1; padding:20px;">
+      <div style="font-size:13px; color:var(--muted)">Henüz kayıt yok. Yukarıdan puan girin!</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- CHARTS -->
+  <div class="section-label">Grafikler</div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Zaman İçinde İlerleme</div>
+      <div class="chart-subtitle">Oturum başına toplam puan</div>
+      <div class="chart-wrap"><canvas id="lineChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Ders Karşılaştırması</div>
+      <div class="chart-subtitle">Son oturumda derse göre net % (maks. nete oranla)</div>
+      <div class="chart-wrap-bar">
+        <div class="chart-wrap-bar-inner"><canvas id="barChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- HISTORY -->
+  <div class="section-label">Geçmiş</div>
+  <div class="history-card">
+    <div class="history-header">
+      <span class="history-title" id="historyTitle">TYT Oturumları</span>
+      <button class="clear-btn" onclick="clearHistory()">Tümünü Sil</button>
+    </div>
+    <div class="history-body-scroll">
+      <div id="historyBody"></div>
+    </div>
+  </div>
+
+  </div><!-- /scoresPage -->
+
+  <div id="pomodoroPage" class="hidden">
+    <div class="pomo-wrap">
+      <div class="pomo-card">
+
+        <!-- MODE SELECTOR -->
+        <div class="pomo-mode-badge">
+          <button class="pomo-mode-btn mode-study active" id="modeStudy" onclick="setMode('study')">📚 Çalışma</button>
+          <button class="pomo-mode-btn mode-short" id="modeShort" onclick="setMode('short')">☕ Kısa Mola</button>
+          <button class="pomo-mode-btn mode-long"  id="modeLong"  onclick="setMode('long')">🌙 Uzun Mola</button>
+        </div>
+
+        <!-- RING TIMER -->
+        <div class="pomo-ring-wrap">
+          <svg class="pomo-svg" viewBox="0 0 200 200">
+            <circle class="pomo-ring-bg" cx="100" cy="100" r="88"/>
+            <circle class="pomo-ring-progress" id="pomoRing" cx="100" cy="100" r="88"
+              stroke-dasharray="553" stroke-dashoffset="0"/>
+          </svg>
+          <div class="pomo-time-display">
+            <div class="pomo-time study-color" id="pomoDisplay">25:00</div>
+            <div class="pomo-session-label" id="pomoModeLabel">Çalışma Zamanı</div>
+          </div>
+        </div>
+
+        <!-- MAIN CONTROLS -->
+        <div class="pomo-controls">
+          <button class="pomo-btn" onclick="pomoPrev()" title="Önceki">⏮</button>
+          <button class="pomo-btn pomo-btn-main" id="pomoPauseBtn" onclick="pomoToggle()">▶</button>
+          <button class="pomo-btn" onclick="pomoSkip()" title="Atla">⏭</button>
+        </div>
+
+        <!-- LOOP DOTS -->
+        <div>
+          <div class="pomo-loops-row" id="pomoLoops"></div>
+          <div class="pomo-streak" style="margin-top:8px">
+            Bugün <span id="pomoStreakCount">0</span> pomodoro tamamlandı 🔥
+          </div>
+        </div>
+
+        <!-- TIME ADJUSTERS -->
+        <div class="pomo-adjusters">
+          <div class="pomo-adj-card">
+            <div class="pomo-adj-label">Çalışma<br>Süresi</div>
+            <div class="pomo-adj-row">
+              <button class="pomo-adj-btn" onclick="adjustTime('study',-1)">−</button>
+              <div class="pomo-adj-val" id="adjStudy">25</div>
+              <button class="pomo-adj-btn" onclick="adjustTime('study',1)">+</button>
+            </div>
+          </div>
+          <div class="pomo-adj-card">
+            <div class="pomo-adj-label">Kısa Mola<br>Süresi</div>
+            <div class="pomo-adj-row">
+              <button class="pomo-adj-btn" onclick="adjustTime('short',-1)">−</button>
+              <div class="pomo-adj-val" id="adjShort">5</div>
+              <button class="pomo-adj-btn" onclick="adjustTime('short',1)">+</button>
+            </div>
+          </div>
+          <div class="pomo-adj-card">
+            <div class="pomo-adj-label">Uzun Mola<br>Süresi</div>
+            <div class="pomo-adj-row">
+              <button class="pomo-adj-btn" onclick="adjustTime('long',-1)">−</button>
+              <div class="pomo-adj-val" id="adjLong">15</div>
+              <button class="pomo-adj-btn" onclick="adjustTime('long',1)">+</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- TARGET UNIVERSITY PAGE -->
+  <div id="targetPage" class="hidden">
+
+    <div class="section-label">Üniversite & Bölüm Seç</div>
+
+    <div class="target-selects-row">
+      <select class="target-uni-select" id="uniSelect" onchange="onUniChange()">
+        <option value="">— Üniversite Seç —</option>
+      </select>
+      <select class="target-uni-select" id="deptSelect" onchange="onDeptChange()">
+        <option value="">— Bölüm Seç —</option>
+      </select>
+    </div>
+
+    <div id="targetContent">
+      <div class="target-empty">
+        <div style="font-size:32px;margin-bottom:8px">🎓</div>
+        Hedef üniversiteni ve bölümünü seçerek başla.
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+// ─── YKS NET & POINT CALCULATION ─────────────────────────────────────────────
+// Net = correct - (wrong / 4)
+// TYT base score = 100, each net contributes a subject-weighted coefficient
+// AYT base score = 100, subject nets weighted by ÖSYM coefficients
+//
+// Official ÖSYM formula (simplified for practice tracking):
+//   TYT Puan = 100 + Σ(net_i × coeff_i)
+//   AYT Puan = 100 + Σ(net_i × coeff_i)
+//
+// Coefficients below are derived from ÖSYM's published score tables.
+// TYT total questions: 120  AYT total questions: 80
+
+const TYT_COEFFICIENTS = {
+  turkce:    1.333,   // 40 questions, high weight
+  sosyal:    1.000,   // 20 questions
+  matematik: 1.333,   // 40 questions
+  fen:       1.000,   // 20 questions
+};
+
+const AYT_COEFFICIENTS = {
+  // Sayısal (MF) track weights — also used as general AYT
+  mat:        3.000,
+  fizik:      2.857,
+  kimya:      2.857,
+  biyoloji:   2.857,
+  edebiyat:   3.000,
+  tarih1:     3.000,
+  cografya1:  3.000,
+};
+
+function calcNet(correct, wrong) {
+  const net = correct - (wrong / 4);
+  return Math.max(0, Math.round(net * 100) / 100); // floor at 0, 2dp
+}
+
+function calcTYTScore(nets) {
+  let score = 100;
+  for (const [key, coeff] of Object.entries(TYT_COEFFICIENTS)) {
+    score += (nets[key] || 0) * coeff;
+  }
+  return Math.round(score * 100) / 100;
+}
+
+function calcAYTScore(nets) {
+  let score = 100;
+  for (const [key, coeff] of Object.entries(AYT_COEFFICIENTS)) {
+    score += (nets[key] || 0) * coeff;
+  }
+  return Math.round(score * 100) / 100;
+}
+
+function calcScore(exam, nets) {
+  return exam === 'TYT' ? calcTYTScore(nets) : calcAYTScore(nets);
+}
+
+// ─── PERSISTENT STATE ENGINE ──────────────────────────────────────────────────
+// Uses IndexedDB — works on local files in Android Chrome, unlike localStorage.
+
+const DB_NAME    = 'yks_takip_db';
+const DB_VERSION = 1;
+const STORE_NAME = 'state';
+const STATE_KEY  = 'app_state';
+
+let db = null;
+
+const DEFAULT_STATE = {
+  scores:      { TYT: [], AYT: [] },
+  examDates:   { TYT: null, AYT: null },
+  pomoSettings:{ study: 25, short: 5, long: 15 },
+  pomoToday:   0,
+  pomoDate:    new Date().toDateString()
+};
+
+// Deep clone helper
+function cloneState(s) { return JSON.parse(JSON.stringify(s)); }
+
+let APP_STATE = cloneState(DEFAULT_STATE);
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      e.target.result.createObjectStore(STORE_NAME);
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e);
+  });
+}
+
+async function loadState() {
+  try {
+    db = await openDB();
+    const tx  = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.get(STATE_KEY);
+    return new Promise(resolve => {
+      req.onsuccess = () => {
+        if (req.result) {
+          // Merge with defaults so new keys are always present
+          APP_STATE = Object.assign(cloneState(DEFAULT_STATE), req.result);
+          // Reset pomo daily count if it's a new day
+          const today = new Date().toDateString();
+          if (APP_STATE.pomoDate !== today) {
+            APP_STATE.pomoToday = 0;
+            APP_STATE.pomoDate  = today;
+          }
+        }
+        resolve();
+      };
+      req.onerror = () => resolve(); // fallback to defaults
+    });
+  } catch(e) {
+    console.warn('IndexedDB unavailable, using in-memory state:', e);
+  }
+}
+
+function persistState() {
+  if (!db) return;
+  try {
+    const tx    = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put(APP_STATE, STATE_KEY);
+  } catch(e) {
+    console.warn('Could not persist state:', e);
+  }
+}
+
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const SUBJECTS = {
+  TYT: [
+    { key: 'turkce',    label: 'Türkçe',       max: 40 },
+    { key: 'sosyal',    label: 'Sosyal Bilim',  max: 20 },
+    { key: 'matematik', label: 'Matematik',     max: 40 },
+    { key: 'fen',       label: 'Fen Bilimleri', max: 20 },
+  ],
+  AYT: [
+    { key: 'mat',       label: 'Matematik',     max: 40 },
+    { key: 'fizik',     label: 'Fizik',         max: 14 },
+    { key: 'kimya',     label: 'Kimya',         max: 13 },
+    { key: 'biyoloji',  label: 'Biyoloji',      max: 13 },
+    { key: 'edebiyat',  label: 'Türk Ed.',      max: 24 },
+    { key: 'tarih1',    label: 'Tarih-1',       max: 10 },
+    { key: 'cografya1', label: 'Coğrafya-1',    max: 6  },
+  ]
+};
+
+const COLORS_TYT = ['#a855f7','#c084fc','#d8b4fe','#7c3aed'];
+const COLORS_AYT = ['#818cf8','#6366f1','#a5b4fc','#4f46e5','#c7d2fe','#e0e7ff','#6366f1'];
+
+let currentExam = 'TYT';
+let lineChart, barChart;
+
+function getData() { return APP_STATE.scores; }
+function saveData(d) { APP_STATE.scores = d; persistState(); }
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+document.getElementById('todayDate').textContent = new Date().toLocaleDateString('tr-TR', {day:'numeric',month:'long',year:'numeric'});
+document.getElementById('sessionDate').value = new Date().toISOString().split('T')[0];
+
+function switchExam(exam) {
+  currentExam = exam;
+  document.querySelectorAll('.tab').forEach(t => {
+    t.className = 'tab';
+    if (t.textContent.startsWith(exam)) {
+      t.classList.add(exam === 'TYT' ? 'active-tyt' : 'active-ayt');
+    }
+  });
+  document.getElementById('saveBtn').className = 'save-btn save-btn-' + exam.toLowerCase();
+  renderAll();
+}
+
+function renderAll() {
+  renderInputs();
+  renderStats();
+  renderCharts();
+  renderHistory();
+  document.getElementById('entryLabel').textContent = currentExam + ' — Doğru / Yanlış Gir';
+  document.getElementById('statsLabel').textContent = currentExam + ' — Genel Bakış';
+  document.getElementById('historyTitle').textContent = currentExam + ' Oturumları';
+}
+
+// ─── INPUTS ──────────────────────────────────────────────────────────────────
+function renderInputs() {
+  const subjects = SUBJECTS[currentExam];
+  const grid = document.getElementById('scoreGrid');
+  grid.innerHTML = subjects.map(s => `
+    <div class="score-card">
+      <label>${s.label} <span style="color:var(--muted);font-weight:400">(/${s.max})</span></label>
+      <div style="display:flex;gap:6px;margin-top:4px;">
+        <div style="flex:1">
+          <div style="font-size:9px;color:var(--success);font-weight:700;letter-spacing:.6px;margin-bottom:3px">DOĞRU</div>
+          <input type="number" id="inp_${s.key}_d" min="0" max="${s.max}" placeholder="0"
+            style="width:100%;border:none;outline:none;font-family:'DM Serif Display',serif;font-size:22px;color:var(--success);background:none;-moz-appearance:textfield;"
+            oninput="onDYChange('${s.key}','${s.max}')">
+        </div>
+        <div style="width:1px;background:var(--border);margin:0 2px;"></div>
+        <div style="flex:1">
+          <div style="font-size:9px;color:var(--danger);font-weight:700;letter-spacing:.6px;margin-bottom:3px">YANLIŞ</div>
+          <input type="number" id="inp_${s.key}_y" min="0" max="${s.max}" placeholder="0"
+            style="width:100%;border:none;outline:none;font-family:'DM Serif Display',serif;font-size:22px;color:var(--danger);background:none;-moz-appearance:textfield;"
+            oninput="onDYChange('${s.key}','${s.max}')">
+        </div>
+      </div>
+      <div id="net_${s.key}" style="font-size:11px;color:var(--muted);margin-top:6px;min-height:16px"></div>
+    </div>
+  `).join('');
+}
+
+function onDYChange(key, max) {
+  const d = parseFloat(document.getElementById('inp_' + key + '_d').value) || 0;
+  const y = parseFloat(document.getElementById('inp_' + key + '_y').value) || 0;
+  const net = calcNet(d, y);
+  const netEl = document.getElementById('net_' + key);
+  if (d > 0 || y > 0) {
+    netEl.innerHTML = `Net: <span style="color:var(--purple-bright);font-weight:700">${net.toFixed(2)}</span>`;
+  } else {
+    netEl.innerHTML = '';
+  }
+}
+
+// ─── SAVE ─────────────────────────────────────────────────────────────────────
+function saveSession() {
+  const subjects = SUBJECTS[currentExam];
+  const nets = {};
+  const corrects = {};
+  const wrongs = {};
+  let valid = true;
+
+  for (const s of subjects) {
+    const d = parseFloat(document.getElementById('inp_' + s.key + '_d').value);
+    const y = parseFloat(document.getElementById('inp_' + s.key + '_y').value);
+    if (isNaN(d) || d < 0 || d > s.max) { valid = false; break; }
+    const yVal = isNaN(y) ? 0 : Math.min(y, s.max - d);
+    if (d + yVal > s.max) { valid = false; break; }
+    corrects[s.key] = d;
+    wrongs[s.key] = yVal;
+    nets[s.key] = calcNet(d, yVal);
+  }
+
+  if (!valid) {
+    alert('Lütfen tüm alanlara geçerli değerler girin (Doğru + Yanlış ≤ Toplam soru sayısı).');
+    return;
+  }
+
+  const yksScore = calcScore(currentExam, nets);
+  const totalNet = Object.values(nets).reduce((a, b) => a + b, 0);
+
+  const dateVal = document.getElementById('sessionDate').value;
+  const data = getData();
+  data[currentExam].push({ date: dateVal, nets, corrects, wrongs, totalNet: Math.round(totalNet * 100) / 100, yksScore });
+  data[currentExam].sort((a, b) => a.date.localeCompare(b.date));
+  saveData(data);
+
+  // clear inputs
+  subjects.forEach(s => {
+    document.getElementById('inp_' + s.key + '_d').value = '';
+    document.getElementById('inp_' + s.key + '_y').value = '';
+    const netEl = document.getElementById('net_' + s.key);
+    if (netEl) netEl.innerHTML = '';
+  });
+
+  const confirm = document.getElementById('saveConfirm');
+  confirm.classList.add('visible');
+  setTimeout(() => confirm.classList.remove('visible'), 2000);
+
+  renderStats();
+  renderCharts();
+  renderHistory();
+}
+
+// ─── STATS ────────────────────────────────────────────────────────────────────
+function renderStats() {
+  const sessions = getData()[currentExam];
+  const container = document.getElementById('statsRow');
+  if (!sessions.length) {
+    container.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:20px;"><div style="font-size:13px;color:var(--muted)">Henüz kayıt yok. Yukarıdan puan girin!</div></div>`;
+    return;
+  }
+
+  const last = sessions[sessions.length - 1];
+  const prev = sessions.length > 1 ? sessions[sessions.length - 2] : null;
+  const subjects = SUBJECTS[currentExam];
+  const color = currentExam === 'TYT' ? 'var(--accent-tyt)' : 'var(--accent-ayt)';
+
+  // Support old sessions that stored scores instead of nets
+  const lastNets = last.nets || last.scores || {};
+  const prevNets = prev ? (prev.nets || prev.scores || {}) : null;
+
+  let html = '';
+  subjects.forEach(s => {
+    const curr = lastNets[s.key] || 0;
+    const p = prevNets ? (prevNets[s.key] || 0) : null;
+    const diff = p !== null ? curr - p : null;
+    let trendHtml = '';
+    if (diff !== null) {
+      if (diff > 0) trendHtml = `<div class="stat-trend trend-up">↑ +${diff.toFixed(2)}</div>`;
+      else if (diff < 0) trendHtml = `<div class="stat-trend trend-down">↓ ${diff.toFixed(2)}</div>`;
+      else trendHtml = `<div class="stat-trend trend-flat">— Aynı</div>`;
+    }
+    html += `
+      <div class="stat-card">
+        <div class="stat-value" style="color:${color};font-size:22px">${curr.toFixed(2)}</div>
+        <div class="stat-label">${s.label}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">net</div>
+        ${trendHtml}
+      </div>`;
+  });
+
+  // YKS Score card
+  const yksScore = last.yksScore || last.total || 0;
+  const prevYks  = prev ? (prev.yksScore || prev.total || 0) : null;
+  let yksTrend = '';
+  if (prevYks !== null) {
+    const diff = yksScore - prevYks;
+    if (diff > 0) yksTrend = `<div class="stat-trend trend-up">↑ +${diff.toFixed(2)}</div>`;
+    else if (diff < 0) yksTrend = `<div class="stat-trend trend-down">↓ ${diff.toFixed(2)}</div>`;
+    else yksTrend = `<div class="stat-trend trend-flat">— Aynı</div>`;
+  }
+  html += `
+    <div class="stat-card" style="border-color:${color};border-width:2px;">
+      <div class="stat-value" style="color:${color}">${yksScore.toFixed(2)}</div>
+      <div class="stat-label">YKS Puanı</div>
+      ${yksTrend}
+    </div>`;
+
+  container.innerHTML = html;
+}
+
+// ─── CHARTS ───────────────────────────────────────────────────────────────────
+function renderCharts() {
+  const sessions = getData()[currentExam];
+  const subjects = SUBJECTS[currentExam];
+  const colors = currentExam === 'TYT' ? COLORS_TYT : COLORS_AYT;
+  const accent = currentExam === 'TYT' ? '#a855f7' : '#818cf8';
+
+  if (lineChart) lineChart.destroy();
+  if (barChart)  barChart.destroy();
+
+  const lineCtx = document.getElementById('lineChart').getContext('2d');
+  const barCtx  = document.getElementById('barChart').getContext('2d');
+
+  // Give bar chart a minimum pixel width so bars don't squish on mobile
+  const barSubjects = subjects.length;
+  const barMinWidth = Math.max(320, barSubjects * 56);
+  const barInner = document.querySelector('.chart-wrap-bar-inner');
+  if (barInner) barInner.style.minWidth = barMinWidth + 'px';
+
+  const labels = sessions.map(s => {
+    const d = new Date(s.date);
+    return d.toLocaleDateString('tr-TR', {day:'numeric', month:'short'});
+  });
+
+  // Line chart — YKS score over time
+  lineChart = new Chart(lineCtx, {
+    type: 'line',
+    data: {
+      labels: labels.length ? labels : ['—'],
+      datasets: [{
+        label: 'YKS Puanı',
+        data: sessions.map(s => s.yksScore || s.total || 0),
+        borderColor: accent,
+        backgroundColor: accent + '18',
+        borderWidth: 2.5,
+        pointBackgroundColor: accent,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: true,
+        tension: 0.35,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: {
+        label: ctx => ' YKS: ' + ctx.parsed.y.toFixed(2)
+      }}},
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#6b6a8a' } },
+        y: { grid: { color: '#1e1a3a' }, ticks: { font: { family: 'DM Sans', size: 11 }, color: '#6b6a8a' }, beginAtZero: false }
+      }
+    }
+  });
+
+  // Bar chart — last session nets as % of max possible, so all subjects are comparable
+  const lastSession = sessions.length ? sessions[sessions.length - 1] : null;
+  const lastNets = lastSession ? (lastSession.nets || lastSession.scores || {}) : {};
+  // % of max net (max net = all correct, 0 wrong = max questions)
+  const lastNetPct = subjects.map(s => {
+    const net = lastNets[s.key] || 0;
+    return Math.round((net / s.max) * 100 * 10) / 10; // % to 1dp
+  });
+
+  barChart = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: subjects.map(s => s.label),
+      datasets: [{
+        label: 'Net %',
+        data: lastNetPct,
+        backgroundColor: colors.slice(0, subjects.length),
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: ctx => {
+            const s = subjects[ctx.dataIndex];
+            const net = lastNets[s.key] || 0;
+            return ` Net: ${net.toFixed(2)} / ${s.max}  (${ctx.parsed.y}%)`;
+          }
+        }}
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { family: 'DM Sans', size: 10 }, color: '#6b6a8a' } },
+        y: {
+          grid: { color: '#1e1a3a' },
+          ticks: { font: { family: 'DM Sans', size: 11 }, color: '#6b6a8a', callback: v => v + '%' },
+          beginAtZero: true,
+          max: 100
+        }
+      }
+    }
+  });
+}
+
+// ─── HISTORY ──────────────────────────────────────────────────────────────────
+function renderHistory() {
+  const sessions = getData()[currentExam];
+  const subjects = SUBJECTS[currentExam];
+  const pill = currentExam === 'TYT' ? 'pill-tyt' : 'pill-ayt';
+  const container = document.getElementById('historyBody');
+
+  if (!sessions.length) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div>Henüz oturum kaydedilmedi.</div>`;
+    return;
+  }
+
+  const headers = subjects.map(s => `<th>${s.label}<br><span style="font-weight:400;color:var(--muted)">net</span></th>`).join('');
+  const rows = [...sessions].reverse().map(sess => {
+    const dateStr = new Date(sess.date).toLocaleDateString('tr-TR', {day:'numeric', month:'short', year:'numeric'});
+    const nets = sess.nets || sess.scores || {};
+    const corrects = sess.corrects || {};
+    const wrongs   = sess.wrongs   || {};
+    const cells = subjects.map(s => {
+      const net = nets[s.key] || 0;
+      const d   = corrects[s.key] !== undefined ? corrects[s.key] : '—';
+      const y   = wrongs[s.key]   !== undefined ? wrongs[s.key]   : '—';
+      return `<td>
+        <div style="font-weight:700">${net.toFixed(2)}</div>
+        <div style="font-size:10px;color:var(--muted)"><span style="color:var(--success)">${d}D</span> <span style="color:var(--danger)">${y}Y</span></div>
+      </td>`;
+    }).join('');
+    const yks = sess.yksScore || sess.total || 0;
+    return `<tr>
+      <td>${dateStr}</td>
+      ${cells}
+      <td><span class="score-pill ${pill}">${typeof yks === 'number' ? yks.toFixed(2) : yks}</span></td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `
+    <table class="history-table">
+      <thead><tr><th>Tarih</th>${headers}<th>YKS Puanı</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function clearHistory() {
+  if (!confirm('Bu sınavın tüm geçmişi silinecek. Emin misiniz?')) return;
+  const data = getData();
+  data[currentExam] = [];
+  saveData(data);
+  renderStats();
+  renderCharts();
+  renderHistory();
+}
+
+// ─── COUNTDOWN ───────────────────────────────────────────────────────────────
+let cdExam = 'TYT';
+let cdInterval = null;
+
+function getCdDates() {
+  return APP_STATE.examDates;
+}
+function saveCdDates(d) { APP_STATE.examDates = d; persistState(); }
+
+function switchCdExam(exam) {
+  cdExam = exam;
+  document.getElementById('cdTabTYT').className = 'exam-tab-cd' + (exam === 'TYT' ? ' active-tyt' : '');
+  document.getElementById('cdTabAYT').className = 'exam-tab-cd' + (exam === 'AYT' ? ' active-ayt' : '');
+  renderCountdown();
+}
+
+function showDateEdit() {
+  const dates = getCdDates();
+  const current = dates[cdExam] || '';
+  document.getElementById('cdEditArea').innerHTML = `
+    <div class="date-edit-row">
+      <input type="date" id="cdDateInput" value="${current}">
+      <button onclick="saveCdDate()">Kaydet</button>
+      <button onclick="cancelCdEdit()" style="background:var(--bg);color:var(--muted);border:1px solid var(--border);">İptal</button>
+    </div>`;
+}
+
+function cancelCdEdit() {
+  document.getElementById('cdEditArea').innerHTML =
+    '<button class="countdown-edit" onclick="showDateEdit()">📅 Sınav tarihini ayarla</button>';
+}
+
+function saveCdDate() {
+  const val = document.getElementById('cdDateInput').value;
+  if (!val) return;
+  const dates = getCdDates();
+  dates[cdExam] = val;
+  saveCdDates(dates);
+  cancelCdEdit();
+  renderCountdown();
+}
+
+function renderCountdown() {
+  if (cdInterval) clearInterval(cdInterval);
+  updateCd();
+  cdInterval = setInterval(updateCd, 30000);
+}
+
+function updateCd() {
+  const dates = getCdDates();
+  const dateStr = dates[cdExam];
+  const headline = document.getElementById('cdHeadline');
+
+  if (!dateStr) {
+    headline.textContent = cdExam + ' sınav tarihi belirlenmedi';
+    document.getElementById('cdDays').textContent = '—';
+    document.getElementById('cdHours').textContent = '—';
+    document.getElementById('cdMins').textContent = '—';
+    document.getElementById('cdDayBlock').className = 'cd-block';
+    return;
+  }
+
+  const examDate = new Date(dateStr + 'T09:00:00');
+  const now = new Date();
+  const diff = examDate - now;
+
+  if (diff <= 0) {
+    headline.textContent = cdExam + ' sınavı tamamlandı! 🎉';
+    document.getElementById('cdDays').textContent = '0';
+    document.getElementById('cdHours').textContent = '0';
+    document.getElementById('cdMins').textContent = '0';
+    return;
+  }
+
+  const days  = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const mins  = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+  const dateFormatted = new Date(dateStr).toLocaleDateString('tr-TR', {day:'numeric', month:'long', year:'numeric'});
+  headline.textContent = cdExam + ' — ' + dateFormatted;
+
+  document.getElementById('cdDays').textContent  = days;
+  document.getElementById('cdHours').textContent = hours;
+  document.getElementById('cdMins').textContent  = mins;
+
+  const urgency = days <= 30 ? 'urgent' : days <= 90 ? 'soon' : 'safe';
+  document.getElementById('cdDayBlock').className = 'cd-block ' + urgency;
+}
+
+
+// ─── PAGE SWITCHER ────────────────────────────────────────────────────────────
+let currentPage = 'scores';
+
+function switchPage(page) {
+  currentPage = page;
+  const scoresPage  = document.getElementById('scoresPage');
+  const pomodoroPage = document.getElementById('pomodoroPage');
+
+  const targetPage2 = document.getElementById('targetPage');
+  // hide all pages first
+  scoresPage.classList.add('hidden');
+  pomodoroPage.classList.add('hidden');
+  targetPage2.classList.add('hidden');
+  // clear all tab highlights
+  ['tabTYT','tabAYT','tabPomo','tabTarget'].forEach(id => {
+    document.getElementById(id).classList.remove('active-tyt','active-ayt');
+  });
+
+  if (page === 'pomodoro') {
+    pomodoroPage.classList.remove('hidden');
+    document.getElementById('tabPomo').classList.add('active-tyt');
+  } else if (page === 'target') {
+    targetPage2.classList.remove('hidden');
+    document.getElementById('tabTarget').classList.add('active-tyt');
+  } else {
+    scoresPage.classList.remove('hidden');
+    const exam = currentExam;
+    document.getElementById('tab'+exam).classList.add(exam==='TYT'?'active-tyt':'active-ayt');
+  }
+}
+
+// ─── POMODORO ────────────────────────────────────────────────────────────────
+const POMO_CIRCUMFERENCE = 2 * Math.PI * 88; // 553
+
+const pomoSettings = APP_STATE.pomoSettings;
+
+let pomoMode      = 'study';   // study | short | long
+let pomoRunning   = false;
+let pomoInterval  = null;
+let pomoSecondsLeft = pomoSettings.study * 60;
+let pomoTotalSecs   = pomoSettings.study * 60;
+let pomoCycleCount  = 0;       // how many study sessions done this loop (0–3)
+let pomoSessionsDone = APP_STATE.pomoToday;
+const LONG_BREAK_EVERY = 4;
+
+const MODE_META = {
+  study: { label: 'Çalışma Zamanı',  colorClass: 'study-color',  ringClass: '',               btnClass: 'mode-study' },
+  short: { label: 'Kısa Mola ☕',    colorClass: 'short-color',  ringClass: 'mode-short-ring', btnClass: 'mode-short' },
+  long:  { label: 'Uzun Mola 🌙',    colorClass: 'long-color',   ringClass: 'mode-long-ring',  btnClass: 'mode-long'  },
+};
+
+function savPomoSettings() {
+  APP_STATE.pomoSettings = pomoSettings; persistState();
+}
+
+function pomoInit() {
+  pomoSecondsLeft = pomoSettings[pomoMode] * 60;
+  pomoTotalSecs   = pomoSettings[pomoMode] * 60;
+  pomoRender();
+  renderLoopDots();
+  document.getElementById('pomoStreakCount').textContent = pomoSessionsDone;
+  document.getElementById('adjStudy').textContent = pomoSettings.study;
+  document.getElementById('adjShort').textContent = pomoSettings.short;
+  document.getElementById('adjLong').textContent  = pomoSettings.long;
+}
+
+function pomoRender() {
+  const m = String(Math.floor(pomoSecondsLeft / 60)).padStart(2,'0');
+  const s = String(pomoSecondsLeft % 60).padStart(2,'0');
+  document.getElementById('pomoDisplay').textContent = m + ':' + s;
+
+  const meta = MODE_META[pomoMode];
+  const display = document.getElementById('pomoDisplay');
+  display.className = 'pomo-time ' + meta.colorClass;
+  document.getElementById('pomoModeLabel').textContent = meta.label;
+
+  const ring = document.getElementById('pomoRing');
+  const progress = pomoTotalSecs > 0 ? pomoSecondsLeft / pomoTotalSecs : 1;
+  ring.style.strokeDashoffset = POMO_CIRCUMFERENCE * (1 - progress);
+  ring.className = 'pomo-ring-progress ' + meta.ringClass;
+
+  document.getElementById('pomoPauseBtn').textContent = pomoRunning ? '⏸' : '▶';
+
+  // mode buttons
+  ['study','short','long'].forEach(m => {
+    const btn = document.getElementById('mode' + m.charAt(0).toUpperCase() + m.slice(1));
+    btn.classList.toggle('active', m === pomoMode);
+  });
+}
+
+function renderLoopDots() {
+  const container = document.getElementById('pomoLoops');
+  let html = '';
+  for (let i = 0; i < LONG_BREAK_EVERY; i++) {
+    let cls = 'pomo-loop-dot';
+    if (i < pomoCycleCount) cls += ' done';
+    else if (i === pomoCycleCount && pomoMode === 'study') cls += ' active';
+    html += '<div class="' + cls + '"></div>';
+  }
+  html += '<span class="pomo-loop-label">' + pomoCycleCount + ' / ' + LONG_BREAK_EVERY + '</span>';
+  container.innerHTML = html;
+}
+
+function pomoToggle() {
+  if (pomoRunning) {
+    clearInterval(pomoInterval);
+    pomoRunning = false;
+  } else {
+    pomoRunning = true;
+    pomoInterval = setInterval(() => {
+      pomoSecondsLeft--;
+      pomoRender();
+      if (pomoSecondsLeft <= 0) {
+        clearInterval(pomoInterval);
+        pomoRunning = false;
+        pomoOnComplete();
+      }
+    }, 1000);
+  }
+  pomoRender();
+}
+
+function pomoOnComplete() {
+  // Play a soft beep via Web Audio
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.15, 0.3].forEach(delay => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = 660;
+      gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+      gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + delay + 0.05);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + delay + 0.35);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.4);
+    });
+  } catch(e) {}
+
+  if (pomoMode === 'study') {
+    pomoSessionsDone++;
+    APP_STATE.pomoToday = pomoSessionsDone; persistState();
+    document.getElementById('pomoStreakCount').textContent = pomoSessionsDone;
+    pomoCycleCount++;
+    if (pomoCycleCount >= LONG_BREAK_EVERY) {
+      pomoCycleCount = 0;
+      setMode('long');
+    } else {
+      setMode('short');
+    }
+  } else {
+    setMode('study');
+  }
+  renderLoopDots();
+  // auto-start next phase
+  setTimeout(() => { pomoToggle(); }, 800);
+}
+
+function setMode(mode) {
+  if (pomoRunning) { clearInterval(pomoInterval); pomoRunning = false; }
+  pomoMode = mode;
+  pomoSecondsLeft = pomoSettings[mode] * 60;
+  pomoTotalSecs   = pomoSettings[mode] * 60;
+  pomoRender();
+  renderLoopDots();
+}
+
+function pomoSkip() {
+  if (pomoRunning) { clearInterval(pomoInterval); pomoRunning = false; }
+  pomoOnComplete();
+}
+
+function pomoPrev() {
+  if (pomoRunning) { clearInterval(pomoInterval); pomoRunning = false; }
+  pomoSecondsLeft = pomoSettings[pomoMode] * 60;
+  pomoTotalSecs   = pomoSettings[pomoMode] * 60;
+  pomoRender();
+}
+
+function adjustTime(type, delta) {
+  const min = type === 'study' ? 5 : 1;
+  const max = type === 'study' ? 90 : 30;
+  pomoSettings[type] = Math.max(min, Math.min(max, pomoSettings[type] + delta));
+  savPomoSettings();
+  document.getElementById('adj' + type.charAt(0).toUpperCase() + type.slice(1)).textContent = pomoSettings[type];
+  if (type === pomoMode && !pomoRunning) {
+    pomoSecondsLeft = pomoSettings[type] * 60;
+    pomoTotalSecs   = pomoSettings[type] * 60;
+    pomoRender();
+  }
+}
+
+// ─── UNIVERSITY DATABASE ──────────────────────────────────────────────────────
+const UNI_DB = {
+  "Boğaziçi Üniversitesi": {
+    exam: "AYT",
+    departments: [
+      { name: "Bilgisayar Mühendisliği", minTotal: 98, minScores: { mat:38, fizik:13, kimya:10, biyoloji:8,  edebiyat:20, tarih1:7, cografya1:4 } },
+      { name: "Elektrik-Elektronik Müh.",minTotal: 96, minScores: { mat:37, fizik:13, kimya:9,  biyoloji:7,  edebiyat:19, tarih1:6, cografya1:4 } },
+      { name: "Endüstri Mühendisliği",   minTotal: 94, minScores: { mat:36, fizik:12, kimya:9,  biyoloji:7,  edebiyat:18, tarih1:6, cografya1:3 } },
+      { name: "İşletme",                 minTotal: 88, minScores: { mat:32, fizik:10, kimya:8,  biyoloji:7,  edebiyat:16, tarih1:6, cografya1:3 } },
+      { name: "Psikoloji",               minTotal: 90, minScores: { mat:30, fizik:9,  kimya:8,  biyoloji:9,  edebiyat:20, tarih1:7, cografya1:4 } },
+    ]
+  },
+  "ODTÜ": {
+    exam: "AYT",
+    departments: [
+      { name: "Bilgisayar Mühendisliği", minTotal: 99, minScores: { mat:39, fizik:13, kimya:10, biyoloji:8,  edebiyat:20, tarih1:7, cografya1:4 } },
+      { name: "Elektrik-Elektronik Müh.",minTotal: 97, minScores: { mat:38, fizik:13, kimya:10, biyoloji:7,  edebiyat:19, tarih1:6, cografya1:4 } },
+      { name: "Makine Mühendisliği",     minTotal: 93, minScores: { mat:35, fizik:12, kimya:9,  biyoloji:7,  edebiyat:17, tarih1:6, cografya1:3 } },
+      { name: "Mimarlık",                minTotal: 89, minScores: { mat:31, fizik:10, kimya:8,  biyoloji:7,  edebiyat:18, tarih1:7, cografya1:4 } },
+      { name: "Fizik",                   minTotal: 85, minScores: { mat:33, fizik:13, kimya:10, biyoloji:7,  edebiyat:14, tarih1:5, cografya1:3 } },
+    ]
+  },
+  "İTÜ": {
+    exam: "AYT",
+    departments: [
+      { name: "Bilgisayar Mühendisliği", minTotal: 97, minScores: { mat:38, fizik:13, kimya:9,  biyoloji:7,  edebiyat:19, tarih1:7, cografya1:4 } },
+      { name: "Uçak Mühendisliği",       minTotal: 95, minScores: { mat:37, fizik:13, kimya:9,  biyoloji:7,  edebiyat:18, tarih1:6, cografya1:4 } },
+      { name: "Gemi İnş. ve Denizcilik", minTotal: 88, minScores: { mat:33, fizik:12, kimya:8,  biyoloji:6,  edebiyat:16, tarih1:6, cografya1:3 } },
+      { name: "İnşaat Mühendisliği",     minTotal: 87, minScores: { mat:32, fizik:11, kimya:8,  biyoloji:6,  edebiyat:17, tarih1:6, cografya1:3 } },
+      { name: "Çevre Mühendisliği",      minTotal: 82, minScores: { mat:30, fizik:10, kimya:8,  biyoloji:7,  edebiyat:15, tarih1:6, cografya1:3 } },
+    ]
+  },
+  "Hacettepe Üniversitesi": {
+    exam: "AYT",
+    departments: [
+      { name: "Tıp",                     minTotal:100, minScores: { mat:36, fizik:12, kimya:13, biyoloji:13, edebiyat:16, tarih1:6, cografya1:4 } },
+      { name: "Eczacılık",               minTotal: 94, minScores: { mat:33, fizik:11, kimya:12, biyoloji:12, edebiyat:16, tarih1:6, cografya1:4 } },
+      { name: "Hemşirelik",              minTotal: 84, minScores: { mat:28, fizik:9,  kimya:10, biyoloji:11, edebiyat:15, tarih1:6, cografya1:3 } },
+      { name: "Bilgisayar Mühendisliği", minTotal: 93, minScores: { mat:36, fizik:12, kimya:9,  biyoloji:7,  edebiyat:18, tarih1:6, cografya1:3 } },
+      { name: "Diş Hekimliği",           minTotal: 96, minScores: { mat:34, fizik:11, kimya:12, biyoloji:12, edebiyat:17, tarih1:6, cografya1:4 } },
+    ]
+  },
+  "Ankara Üniversitesi": {
+    exam: "AYT",
+    departments: [
+      { name: "Hukuk",                   minTotal: 92, minScores: { mat:28, fizik:8,  kimya:7,  biyoloji:7,  edebiyat:22, tarih1:9, cografya1:5 } },
+      { name: "Siyaset Bilimi",          minTotal: 88, minScores: { mat:25, fizik:7,  kimya:6,  biyoloji:6,  edebiyat:22, tarih1:9, cografya1:5 } },
+      { name: "Tıp",                     minTotal: 98, minScores: { mat:34, fizik:11, kimya:12, biyoloji:12, edebiyat:17, tarih1:6, cografya1:4 } },
+      { name: "Veteriner",               minTotal: 86, minScores: { mat:29, fizik:9,  kimya:10, biyoloji:11, edebiyat:15, tarih1:6, cografya1:3 } },
+    ]
+  },
+  "İstanbul Üniversitesi": {
+    exam: "AYT",
+    departments: [
+      { name: "Hukuk",                   minTotal: 89, minScores: { mat:26, fizik:7,  kimya:6,  biyoloji:6,  edebiyat:22, tarih1:9, cografya1:5 } },
+      { name: "Tıp",                     minTotal: 97, minScores: { mat:34, fizik:11, kimya:12, biyoloji:12, edebiyat:17, tarih1:6, cografya1:4 } },
+      { name: "İşletme",                 minTotal: 84, minScores: { mat:28, fizik:7,  kimya:6,  biyoloji:6,  edebiyat:20, tarih1:8, cografya1:4 } },
+      { name: "Sosyoloji",               minTotal: 80, minScores: { mat:22, fizik:6,  kimya:5,  biyoloji:5,  edebiyat:22, tarih1:9, cografya1:5 } },
+    ]
+  },
+  "Galatasaray Üniversitesi": {
+    exam: "AYT",
+    departments: [
+      { name: "Hukuk",                   minTotal: 91, minScores: { mat:27, fizik:7,  kimya:6,  biyoloji:6,  edebiyat:23, tarih1:9, cografya1:5 } },
+      { name: "Bilgisayar Mühendisliği", minTotal: 90, minScores: { mat:35, fizik:12, kimya:9,  biyoloji:7,  edebiyat:17, tarih1:6, cografya1:3 } },
+      { name: "İşletme",                 minTotal: 86, minScores: { mat:28, fizik:7,  kimya:6,  biyoloji:6,  edebiyat:21, tarih1:8, cografya1:4 } },
+    ]
+  },
+  "Bilkent Üniversitesi": {
+    exam: "AYT",
+    departments: [
+      { name: "Bilgisayar Bilimleri",    minTotal: 96, minScores: { mat:37, fizik:13, kimya:9,  biyoloji:7,  edebiyat:19, tarih1:7, cografya1:4 } },
+      { name: "Uluslararası İlişkiler",  minTotal: 90, minScores: { mat:26, fizik:7,  kimya:6,  biyoloji:6,  edebiyat:23, tarih1:9, cografya1:5 } },
+      { name: "İşletme",                 minTotal: 88, minScores: { mat:28, fizik:7,  kimya:6,  biyoloji:6,  edebiyat:22, tarih1:8, cografya1:4 } },
+      { name: "Mimarlık",                minTotal: 87, minScores: { mat:30, fizik:9,  kimya:7,  biyoloji:6,  edebiyat:19, tarih1:7, cografya1:4 } },
+    ]
+  },
+  "Koç Üniversitesi": {
+    exam: "AYT",
+    departments: [
+      { name: "Tıp",                     minTotal:101, minScores: { mat:36, fizik:12, kimya:13, biyoloji:13, edebiyat:17, tarih1:6, cografya1:4 } },
+      { name: "Hukuk",                   minTotal: 92, minScores: { mat:27, fizik:7,  kimya:6,  biyoloji:6,  edebiyat:23, tarih1:9, cografya1:5 } },
+      { name: "Bilgisayar Mühendisliği", minTotal: 96, minScores: { mat:37, fizik:13, kimya:9,  biyoloji:7,  edebiyat:19, tarih1:7, cografya1:4 } },
+      { name: "Ekonomi",                 minTotal: 89, minScores: { mat:30, fizik:8,  kimya:7,  biyoloji:6,  edebiyat:21, tarih1:8, cografya1:4 } },
+    ]
+  },
+  "Sabancı Üniversitesi": {
+    exam: "AYT",
+    departments: [
+      { name: "Bilgisayar Bilimleri",    minTotal: 95, minScores: { mat:37, fizik:13, kimya:9,  biyoloji:7,  edebiyat:18, tarih1:7, cografya1:4 } },
+      { name: "Mühendislik ve Doğa Bil.",minTotal: 91, minScores: { mat:34, fizik:12, kimya:9,  biyoloji:7,  edebiyat:17, tarih1:6, cografya1:4 } },
+      { name: "Sanat ve Sosyal Bilimler",minTotal: 87, minScores: { mat:27, fizik:7,  kimya:6,  biyoloji:6,  edebiyat:22, tarih1:8, cografya1:4 } },
+    ]
+  }
+};
+
+// ─── TARGET STATE ─────────────────────────────────────────────────────────────
+let targetUni      = null;
+let targetDept     = null;
+let lockedSubjects = {};
+let targetScores   = {};
+
+function initTargetPage() {
+  const uniSel = document.getElementById('uniSelect');
+  Object.keys(UNI_DB).forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u; opt.textContent = u;
+    uniSel.appendChild(opt);
+  });
+}
+
+function onUniChange() {
+  targetUni  = document.getElementById('uniSelect').value || null;
+  targetDept = null;
+  lockedSubjects = {};
+  const deptSel = document.getElementById('deptSelect');
+  deptSel.innerHTML = '<option value="">— Bölüm Seç —</option>';
+  if (targetUni && UNI_DB[targetUni]) {
+    UNI_DB[targetUni].departments.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.name; opt.textContent = d.name;
+      deptSel.appendChild(opt);
+    });
+  }
+  renderTargetContent();
+}
+
+function onDeptChange() {
+  targetDept = document.getElementById('deptSelect').value || null;
+  lockedSubjects = {};
+  if (targetUni && UNI_DB[targetUni]) {
+    const exam = UNI_DB[targetUni].exam;
+    const sessions = getData()[exam];
+    if (sessions.length) {
+      const last = sessions[sessions.length - 1];
+      targetScores = { ...(last.nets || last.scores || {}) };
+    } else {
+      targetScores = {};
+    }
+  }
+  renderTargetContent();
+}
+
+function getDeptObj() {
+  if (!targetUni || !targetDept) return null;
+  return UNI_DB[targetUni].departments.find(d => d.name === targetDept) || null;
+}
+
+function toggleLock(key) {
+  if (lockedSubjects[key] !== undefined) {
+    delete lockedSubjects[key];
+  } else {
+    const input = document.getElementById('tscore_' + key);
+    lockedSubjects[key] = parseFloat(input.value) || 0;
+  }
+  renderTargetContent();
+}
+
+function onTargetScoreChange(key) {
+  const val = parseFloat(document.getElementById('tscore_' + key).value) || 0;
+  targetScores[key] = val;
+  if (lockedSubjects[key] !== undefined) lockedSubjects[key] = val;
+  computeAndRenderGap();
+}
+
+function renderTargetContent() {
+  const dept = getDeptObj();
+  const container = document.getElementById('targetContent');
+  if (!dept) {
+    container.innerHTML = '<div class="target-empty"><div style="font-size:32px;margin-bottom:8px">🎓</div>Hedef üniversiteni ve bölümünü seçerek başla.</div>';
+    return;
+  }
+
+  const exam     = UNI_DB[targetUni].exam;
+  const subjects = SUBJECTS[exam];
+
+  // Calculate what YKS score the minScores (nets) would yield
+  const minNets = {};
+  subjects.forEach(s => { minNets[s.key] = dept.minScores[s.key] || 0; });
+  const minYKS = calcScore(exam, minNets);
+  const currentNets = {};
+  subjects.forEach(s => { currentNets[s.key] = targetScores[s.key] || 0; });
+  const currentYKS = calcScore(exam, currentNets);
+
+  let html = `
+    <div class="target-info-card">
+      <div>
+        <div class="target-uni-name">${targetUni}</div>
+        <div class="target-dept-name">${dept.name} · ${exam}</div>
+      </div>
+      <div class="target-score-badge">
+        <div class="target-score-num">${minYKS.toFixed(1)}</div>
+        <div class="target-score-label">Min. YKS Puanı</div>
+      </div>
+    </div>`;
+
+  html += '<div class="section-label" style="margin-top:4px">Net Karşılaştırması — Kilitle &amp; Analiz Et</div>';
+  html += '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Değerler net olarak gösterilmektedir. Emin olduğun dersi kilitle.</div>';
+  html += '<div class="target-subject-grid">';
+
+  subjects.forEach(s => {
+    const isLocked = lockedSubjects[s.key] !== undefined;
+    const current  = targetScores[s.key] ?? 0;
+    const required = dept.minScores[s.key] ?? 0;
+    const gap      = current - required;
+    let cardClass  = 'target-subject-card';
+    if (isLocked)      cardClass += ' locked';
+    else if (gap >= 0) cardClass += ' exceeds';
+    else               cardClass += ' needs-work';
+
+    html += `
+      <div class="${cardClass}" id="tcard_${s.key}">
+        <div class="target-subj-top">
+          <span class="target-subj-name">${s.label}</span>
+          <button class="lock-toggle ${isLocked ? 'on' : ''}" onclick="toggleLock('${s.key}')"></button>
+        </div>
+        <input class="target-subj-input" type="number" id="tscore_${s.key}"
+          value="${current}" min="0" max="${s.max}" step="0.25"
+          ${isLocked ? 'disabled' : ''}
+          oninput="onTargetScoreChange('${s.key}')">
+        <div style="font-size:9px;color:var(--muted);margin-top:1px">net</div>
+        <div class="target-subj-required">
+          Gerekli: <span class="req-num ${isLocked ? 'req-lock' : gap >= 0 ? 'req-ok' : 'req-warn'}">${required}</span> net
+          ${isLocked ? ' 🔒' : gap >= 0 ? ' ✓' : ' (' + Math.abs(gap).toFixed(2) + ' net gerek)'}
+        </div>
+      </div>`;
+  });
+
+  html += '</div><div id="targetGapSection"></div>';
+  container.innerHTML = html;
+  computeAndRenderGap();
+}
+
+function computeAndRenderGap() {
+  const dept = getDeptObj();
+  if (!dept) return;
+  const exam     = UNI_DB[targetUni].exam;
+  const subjects = SUBJECTS[exam];
+
+  // Current nets → YKS score
+  const currentNets = {};
+  subjects.forEach(s => { currentNets[s.key] = targetScores[s.key] || 0; });
+  const currentYKS = calcScore(exam, currentNets);
+
+  // Min required nets → YKS score
+  const minNets = {};
+  subjects.forEach(s => { minNets[s.key] = dept.minScores[s.key] || 0; });
+  const minYKS = calcScore(exam, minNets);
+
+  const yksGap   = currentYKS - minYKS;
+  const pct      = Math.min(100, Math.round((currentYKS / minYKS) * 100));
+  const barColor = yksGap >= 0 ? '#34d399' : pct > 70 ? '#fbbf24' : '#a855f7';
+  const gapClass = yksGap > 0 ? 'gap-positive' : yksGap === 0 ? 'gap-zero' : 'gap-negative';
+  const gapText  = yksGap > 0
+    ? '+' + yksGap.toFixed(2) + ' puan fazla — Harika! 🎉'
+    : yksGap === 0 ? '🎯 Tam İsabetli!'
+    : Math.abs(yksGap).toFixed(2) + ' puan eksik';
+
+  let html = `
+    <div class="target-gap-card">
+      <div class="target-gap-row">
+        <span class="target-gap-label">Güncel YKS Puanı</span>
+        <span class="target-gap-value" style="color:var(--text)">${currentYKS.toFixed(2)} / ${minYKS.toFixed(2)}</span>
+      </div>
+      <div class="target-progress-bar-wrap">
+        <div class="target-progress-bar" style="width:${pct}%;background:${barColor};box-shadow:0 0 8px ${barColor}88"></div>
+      </div>
+      <div class="target-gap-row" style="margin-top:12px;margin-bottom:0">
+        <span class="target-gap-label">Hedefe Mesafe</span>
+        <span class="target-gap-value ${gapClass}">${gapText}</span>
+      </div>
+    </div>`;
+
+  html += '<div class="section-label">Ders Bazlı Net Analizi</div>';
+  html += '<div class="improvement-list">';
+
+  subjects.forEach(s => {
+    const current  = targetScores[s.key] || 0;
+    const required = dept.minScores[s.key] || 0;
+    const isLocked = lockedSubjects[s.key] !== undefined;
+    const delta    = current - required;
+    const barPct   = Math.min(100, Math.round((current / s.max) * 100));
+    let deltaLabel, deltaClass, barColor2, rowClass = 'improvement-row';
+    if (isLocked)        { deltaLabel = '🔒 Kilitli'; deltaClass = 'delta-lock'; barColor2 = '#a855f7'; }
+    else if (delta >= 0) { deltaLabel = '+' + delta.toFixed(2) + ' net ✓'; deltaClass = 'delta-ok';   barColor2 = '#34d399'; rowClass += ' done'; }
+    else                 { deltaLabel = delta.toFixed(2) + ' net'; deltaClass = 'delta-warn'; barColor2 = '#f87171'; }
+
+    html += `
+      <div class="${rowClass}">
+        <span class="improvement-subj">${s.label}</span>
+        <div class="improvement-bar-wrap">
+          <div class="improvement-bar" style="width:${barPct}%;background:${barColor2};box-shadow:0 0 4px ${barColor2}88"></div>
+        </div>
+        <span style="font-size:10px;color:var(--muted);min-width:70px;text-align:center">${current.toFixed ? current.toFixed(2) : current} / ${required}</span>
+        <span class="improvement-delta ${deltaClass}">${deltaLabel}</span>
+      </div>`;
+  });
+
+  html += '</div>';
+  const sec = document.getElementById('targetGapSection');
+  if (sec) sec.innerHTML = html;
+}
+
+// ─── START ────────────────────────────────────────────────────────────────────
+async function bootApp() {
+  await loadState();
+  Object.assign(pomoSettings, APP_STATE.pomoSettings);
+  renderAll();
+  renderCountdown();
+  initTargetPage();
+  pomoInit();
+}
+
+(function() {
+  const splash = document.getElementById('splashScreen');
+  if (!splash) return;
+  setTimeout(() => {
+    splash.classList.add('fade-out');
+    setTimeout(() => splash.remove(), 850);
+  }, 2500);
+  splash.addEventListener('click', () => {
+    splash.classList.add('fade-out');
+    setTimeout(() => splash.remove(), 850);
+  });
+})();
+
+bootApp();
+</script>
+</body>
+</html>
